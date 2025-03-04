@@ -3,7 +3,7 @@ import time
 from datetime import datetime
 
 # Lokitiedoston sijainti
-LOGFILE = "/home/sammeli/network_log.txt"
+LOGFILE = ""
 # Kohde, jota pingataan (Googlen DNS)
 PING_TARGET = "8.8.8.8"
 
