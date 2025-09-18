@@ -1,41 +1,81 @@
-import os
+import socket
+import datetime
 import time
-from datetime import datetime
 
 # Lokitiedoston sijainti
-LOGFILE = ""
-# Kohde, jota pingataan (Googlen DNS)
-PING_TARGET = "8.8.8.8"
+FILE = "/path/to/your/logfile"
+
+
+def ping():
+    """Tarkistaa verkkoyhteyden tilan."""
+    try:
+        socket.setdefaulttimeout(3)
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect(("8.8.8.8", 53))
+        s.close()
+        return True
+    except OSError:
+        return False
+
+
+def calculate_time(start, stop):
+    """Laskee katkoksen keston sekunneissa."""
+    difference = stop - start
+    seconds = float(difference.total_seconds())
+    return str(datetime.timedelta(seconds=seconds)).split(".")[0]
+
 
 def log_message(message):
-    """Kirjoittaa viestin lokitiedostoon aikaleiman kanssa."""
-    with open(LOGFILE, "a") as log:
-        log.write(f"{datetime.now()}: {message}\n")
+    """Kirjoittaa viestin lokitiedostoon."""
+    try:
+        with open(FILE, "a") as file:
+            file.write(message + "\n")
+    except IOError as e:
+        print(f"Virhe lokitiedoston kirjoituksessa: {e}")
 
-def check_connection():
-    """Tarkistaa verkkoyhteyden ping-komennolla."""
-    response = os.system(f"ping -c 1 -W 2 {PING_TARGET} > /dev/null 2>&1")
-    return response == 0  # Palauttaa Truen, jos yhteys toimii
+
+def first_check():
+    """Tarkistaa verkkoyhteyden käynnistettäessä."""
+    if ping():
+        connection_time = datetime.datetime.now()
+        log_message("\nYHTEYS HAVAITTU\n")
+        log_message(f"Yhdistetty verkkoon: {connection_time}")
+        return True
+    else:
+        log_message("\nEI YHTEYTTÄ\n")
+        return False
+
 
 def main():
-    log_message("Verkon valvonta aloitettu.")  # Alkuviesti lokitiedostoon
-    was_connected = True  # Alustetaan sillä olettamuksella, että yhteys toimii
+    """Ohjelman päälogiikka."""
+    monitor_start_time = datetime.datetime.now()
+    log_message(f"Valvonta aloitettu: {monitor_start_time}")
 
+    if not first_check():
+        # Odottaa yhteyden palautumista
+        while not ping():
+            time.sleep(1)
+        first_check()
+
+    # Aloittaa yhteyden jatkuvan valvonnan
     while True:
-        # Testataan verkkoyhteys
-        is_connected = check_connection()
+        if not ping():
+            down_time = datetime.datetime.now()
+            log_message(f"Verkko katkennut: {down_time}")
+            print(f"Verkko katkennut: {down_time}")
 
-        # Vain tilan muutokset tallentuvat lokiin
-        if is_connected and not was_connected:
-            log_message("Yhteys palautui.")  # Yhteys palautui
-        elif not is_connected and was_connected:
-            log_message("Yhteys katkennut!")  # Yhteys katkesi
+            while not ping():
+                time.sleep(1)
 
-        # Päivitetään tila seuraavaa kierrosta varten
-        was_connected = is_connected
+            up_time = datetime.datetime.now()
+            downtime_duration = calculate_time(down_time, up_time)
+            log_message(f"Yhdistetty uudelleen: {up_time}")
+            log_message(f"Katkoksen kesto: {downtime_duration}")
+            print(f"Yhdistetty uudelleen: {up_time}")
+            print(f"Katkoksen kesto: {downtime_duration}")
+        else:
+            time.sleep(5)
 
-        # Odota ennen seuraavaa tarkistusta
-        time.sleep(10)  # Tarkistusväli 10 sekuntia
 
 if __name__ == "__main__":
     main()
